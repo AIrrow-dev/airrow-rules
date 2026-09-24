@@ -1,0 +1,8 @@
+{
+  "id": "CUSTOM-SUSPICIOUS-CURL",
+  "name": "Suspicious curl usage",
+  "description": "Detects shell commands that download remote content with curl.",
+  "severity": "medium",
+  "query": "curl http",
+  "enabled": true
+}
