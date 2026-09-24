@@ -1,6 +1,8 @@
 {
-  "name": "stable",
-  "rules": [
-    "CUSTOM-SUSPICIOUS-CURL.json"
-  ]
+  "schema_version": 1,
+  "channel": "stable",
+  "version": "2026.09.1",
+  "published_at": "2026-09-24T12:00:00Z",
+  "bundle_url": "https://github.com/airrowhq/airrow-rules/releases/download/2026.09.1/airrow-rules.json",
+  "sha256": "..."
 }
