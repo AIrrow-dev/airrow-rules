@@ -146,12 +146,15 @@ def build_bundle(channel_name: str) -> dict[str, object]:
         if not isinstance(rule, dict):
             raise ValidationError(f"{rule_path} must contain a JSON object")
         validate_schema(rule, schema)
+        rule_id = rule.get("id")
+        if not isinstance(rule_id, str):
+            raise ValidationError(f"{rule_path} must declare a string id")
         rule_file = Path(rule_filename)
-        if rule_file.suffix != ".json" or rule_file.stem != rule["id"]:
-            raise ValidationError(f"{rule_path} must match rule id filename {rule['id']}.json")
-        if rule["id"] in seen_rule_ids:
-            raise ValidationError(f"Duplicate rule id in channel '{channel_name}': {rule['id']}")
-        seen_rule_ids.add(rule["id"])
+        if rule_file.suffix != ".json" or rule_file.stem != rule_id:
+            raise ValidationError(f"{rule_path} must match rule id filename {rule_id}.json")
+        if rule_id in seen_rule_ids:
+            raise ValidationError(f"Duplicate rule id in channel '{channel_name}': {rule_id}")
+        seen_rule_ids.add(rule_id)
         bundled_rules.append(rule)
 
     return {
@@ -173,13 +176,13 @@ def main() -> int:
 
     try:
         bundle = build_bundle(args.channel)
+
+        if args.output:
+            output_path = resolve_within(REPOSITORY_ROOT, args.output)
+            write_json_atomic(output_path, bundle)
     except ValidationError as error:
         print(error, file=sys.stderr)
         return 1
-
-    if args.output:
-        output_path = Path(args.output)
-        write_json_atomic(output_path, bundle)
 
     if args.check:
         print(f"Validated {len(bundle['rules'])} rule(s) for channel '{bundle['channel']}'.")

@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -244,6 +245,18 @@ class ValidateSchemaTests(unittest.TestCase):
                 output_path.read_text(encoding="utf-8"),
                 '{\n  "channel": "stable",\n  "rules": []\n}\n',
             )
+
+    def test_main_rejects_output_outside_repository(self) -> None:
+        stderr = io.StringIO()
+
+        with mock.patch.object(
+            build_bundle.sys,
+            "argv",
+            ["build_bundle.py", "--output", "../outside/stable.bundle.json"],
+        ), mock.patch.object(build_bundle.sys, "stderr", stderr):
+            self.assertEqual(build_bundle.main(), 1)
+
+        self.assertIn("Path escapes base directory", stderr.getvalue())
 
 
 if __name__ == "__main__":
