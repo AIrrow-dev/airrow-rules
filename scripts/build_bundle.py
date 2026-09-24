@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -35,6 +36,15 @@ def resolve_within(base_dir: Path, relative_path: str) -> Path:
         raise ValidationError(f"Path escapes base directory: {relative_path}") from error
 
     return candidate
+
+
+def write_json_atomic(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as file:
+        file.write(json.dumps(payload, indent=2) + "\n")
+        temp_path = Path(file.name)
+
+    temp_path.replace(path)
 
 
 def validate_schema(instance: object, schema: dict[str, object], path: str = "$") -> None:
@@ -125,6 +135,8 @@ def build_bundle(channel_name: str) -> dict[str, object]:
     bundled_rules = []
     seen_rule_ids: set[str] = set()
     for rule_filename in channel["rules"]:
+        if Path(rule_filename).name != rule_filename:
+            raise ValidationError(f"Rule entry must be a plain filename: {rule_filename}")
         rule_path = resolve_within(RULES_DIR, rule_filename)
         if not rule_path.exists():
             raise ValidationError(f"Rule file not found: {rule_path}")
@@ -167,8 +179,7 @@ def main() -> int:
 
     if args.output:
         output_path = Path(args.output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
+        write_json_atomic(output_path, bundle)
 
     if args.check:
         print(f"Validated {len(bundle['rules'])} rule(s) for channel '{bundle['channel']}'.")

@@ -105,7 +105,39 @@ class ValidateSchemaTests(unittest.TestCase):
             with mock.patch.object(build_bundle, "CHANNELS_DIR", channels_dir), mock.patch.object(
                 build_bundle, "RULES_DIR", rules_dir
             ):
-                with self.assertRaisesRegex(build_bundle.ValidationError, r"Path escapes base directory"):
+                with self.assertRaisesRegex(build_bundle.ValidationError, r"Rule entry must be a plain filename"):
+                    build_bundle.build_bundle("stable")
+
+    def test_rejects_rule_entry_with_subdirectory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            channels_dir = temp_root / "channels"
+            rules_dir = temp_root / "rules"
+            nested_rules_dir = rules_dir / "nested"
+            channels_dir.mkdir()
+            nested_rules_dir.mkdir(parents=True)
+
+            (channels_dir / "stable.json").write_text(
+                json.dumps({"name": "stable", "rules": ["nested/CUSTOM-SUSPICIOUS-CURL.json"]}),
+                encoding="utf-8",
+            )
+            (nested_rules_dir / "CUSTOM-SUSPICIOUS-CURL.json").write_text(
+                json.dumps(
+                    {
+                        "id": "CUSTOM-SUSPICIOUS-CURL",
+                        "name": "Suspicious curl usage",
+                        "description": "Detects shell commands that download remote content with curl.",
+                        "severity": "medium",
+                        "query": "curl http",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(build_bundle, "CHANNELS_DIR", channels_dir), mock.patch.object(
+                build_bundle, "RULES_DIR", rules_dir
+            ):
+                with self.assertRaisesRegex(build_bundle.ValidationError, r"Rule entry must be a plain filename"):
                     build_bundle.build_bundle("stable")
 
     def test_rejects_channel_name_mismatch(self) -> None:
@@ -201,6 +233,17 @@ class ValidateSchemaTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(build_bundle.ValidationError, r"Duplicate rule id in channel"):
                     build_bundle.build_bundle("stable")
+
+    def test_write_json_atomic_writes_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "bundle" / "stable.bundle.json"
+
+            build_bundle.write_json_atomic(output_path, {"channel": "stable", "rules": []})
+
+            self.assertEqual(
+                output_path.read_text(encoding="utf-8"),
+                '{\n  "channel": "stable",\n  "rules": []\n}\n',
+            )
 
 
 if __name__ == "__main__":
