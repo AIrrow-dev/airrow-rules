@@ -123,6 +123,7 @@ def build_bundle(channel_name: str) -> dict[str, object]:
         raise ValidationError(f"{SCHEMA_PATH} must contain a JSON object")
 
     bundled_rules = []
+    seen_rule_ids: set[str] = set()
     for rule_filename in channel["rules"]:
         rule_path = resolve_within(RULES_DIR, rule_filename)
         if not rule_path.exists():
@@ -133,6 +134,12 @@ def build_bundle(channel_name: str) -> dict[str, object]:
         if not isinstance(rule, dict):
             raise ValidationError(f"{rule_path} must contain a JSON object")
         validate_schema(rule, schema)
+        expected_filename = f"{rule['id']}.json"
+        if Path(rule_filename).name != expected_filename:
+            raise ValidationError(f"{rule_path} must match rule id filename {expected_filename}")
+        if rule["id"] in seen_rule_ids:
+            raise ValidationError(f"Duplicate rule id in channel '{channel_name}': {rule['id']}")
+        seen_rule_ids.add(rule["id"])
         bundled_rules.append(rule)
 
     return {

@@ -139,6 +139,69 @@ class ValidateSchemaTests(unittest.TestCase):
                 with self.assertRaisesRegex(build_bundle.ValidationError, r"must declare name 'stable'"):
                     build_bundle.build_bundle("stable")
 
+    def test_rejects_mismatched_rule_filename_and_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            channels_dir = temp_root / "channels"
+            rules_dir = temp_root / "rules"
+            channels_dir.mkdir()
+            rules_dir.mkdir()
+
+            (channels_dir / "stable.json").write_text(
+                json.dumps({"name": "stable", "rules": ["OTHER.json"]}),
+                encoding="utf-8",
+            )
+            (rules_dir / "OTHER.json").write_text(
+                json.dumps(
+                    {
+                        "id": "CUSTOM-SUSPICIOUS-CURL",
+                        "name": "Suspicious curl usage",
+                        "description": "Detects shell commands that download remote content with curl.",
+                        "severity": "medium",
+                        "query": "curl http",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(build_bundle, "CHANNELS_DIR", channels_dir), mock.patch.object(
+                build_bundle, "RULES_DIR", rules_dir
+            ):
+                with self.assertRaisesRegex(build_bundle.ValidationError, r"must match rule id filename"):
+                    build_bundle.build_bundle("stable")
+
+    def test_rejects_duplicate_rule_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            channels_dir = temp_root / "channels"
+            rules_dir = temp_root / "rules"
+            channels_dir.mkdir()
+            rules_dir.mkdir()
+
+            (channels_dir / "stable.json").write_text(
+                json.dumps(
+                    {
+                        "name": "stable",
+                        "rules": ["CUSTOM-SUSPICIOUS-CURL.json", "CUSTOM-SUSPICIOUS-CURL.json"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rule_payload = {
+                "id": "CUSTOM-SUSPICIOUS-CURL",
+                "name": "Suspicious curl usage",
+                "description": "Detects shell commands that download remote content with curl.",
+                "severity": "medium",
+                "query": "curl http",
+            }
+            (rules_dir / "CUSTOM-SUSPICIOUS-CURL.json").write_text(json.dumps(rule_payload), encoding="utf-8")
+
+            with mock.patch.object(build_bundle, "CHANNELS_DIR", channels_dir), mock.patch.object(
+                build_bundle, "RULES_DIR", rules_dir
+            ):
+                with self.assertRaisesRegex(build_bundle.ValidationError, r"Duplicate rule id in channel"):
+                    build_bundle.build_bundle("stable")
+
 
 if __name__ == "__main__":
     unittest.main()
