@@ -13,6 +13,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 RULES_DIR = REPOSITORY_ROOT / "rules"
 SCHEMA_PATH = REPOSITORY_ROOT / "schemas" / "rule.schema.json"
 CHANNELS_DIR = REPOSITORY_ROOT / "channels"
+SAFE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 class ValidationError(Exception):
@@ -22,6 +23,18 @@ class ValidationError(Exception):
 def load_json(path: Path) -> object:
     with path.open("r", encoding="utf-8") as file:
         return json.load(file)
+
+
+def resolve_within(base_dir: Path, relative_path: str) -> Path:
+    base_path = base_dir.resolve()
+    candidate = (base_path / relative_path).resolve()
+
+    try:
+        candidate.relative_to(base_path)
+    except ValueError as error:
+        raise ValidationError(f"Path escapes base directory: {relative_path}") from error
+
+    return candidate
 
 
 def validate_schema(instance: object, schema: dict[str, object], path: str = "$") -> None:
@@ -78,7 +91,10 @@ def validate_schema(instance: object, schema: dict[str, object], path: str = "$"
 
 
 def load_channel(channel_name: str) -> dict[str, object]:
-    channel_path = CHANNELS_DIR / f"{channel_name}.json"
+    if SAFE_NAME_PATTERN.fullmatch(channel_name) is None:
+        raise ValidationError(f"Invalid channel name: {channel_name}")
+
+    channel_path = resolve_within(CHANNELS_DIR, f"{channel_name}.json")
     if not channel_path.exists():
         raise ValidationError(f"Channel file not found: {channel_path}")
 
@@ -105,7 +121,7 @@ def build_bundle(channel_name: str) -> dict[str, object]:
 
     bundled_rules = []
     for rule_filename in channel["rules"]:
-        rule_path = RULES_DIR / rule_filename
+        rule_path = resolve_within(RULES_DIR, rule_filename)
         if not rule_path.exists():
             raise ValidationError(f"Rule file not found: {rule_path}")
         rule = load_json(rule_path)

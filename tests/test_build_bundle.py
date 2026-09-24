@@ -1,6 +1,9 @@
 import importlib.util
+import json
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -80,6 +83,30 @@ class ValidateSchemaTests(unittest.TestCase):
                 },
                 self.schema,
             )
+
+    def test_rejects_invalid_channel_name(self) -> None:
+        with self.assertRaisesRegex(build_bundle.ValidationError, r"Invalid channel name"):
+            build_bundle.load_channel("../schemas/rule.schema")
+
+    def test_rejects_rule_path_outside_rules_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            channels_dir = temp_root / "channels"
+            rules_dir = temp_root / "rules"
+            channels_dir.mkdir()
+            rules_dir.mkdir()
+
+            (channels_dir / "stable.json").write_text(
+                json.dumps({"name": "stable", "rules": ["../outside.json"]}),
+                encoding="utf-8",
+            )
+            (temp_root / "outside.json").write_text("{}", encoding="utf-8")
+
+            with mock.patch.object(build_bundle, "CHANNELS_DIR", channels_dir), mock.patch.object(
+                build_bundle, "RULES_DIR", rules_dir
+            ):
+                with self.assertRaisesRegex(build_bundle.ValidationError, r"Path escapes base directory"):
+                    build_bundle.build_bundle("stable")
 
 
 if __name__ == "__main__":
