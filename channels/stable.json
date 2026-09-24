@@ -1,0 +1,6 @@
+{
+  "name": "stable",
+  "rules": [
+    "CUSTOM-SUSPICIOUS-CURL.json"
+  ]
+}
