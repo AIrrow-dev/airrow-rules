@@ -108,6 +108,37 @@ class ValidateSchemaTests(unittest.TestCase):
                 with self.assertRaisesRegex(build_bundle.ValidationError, r"Path escapes base directory"):
                     build_bundle.build_bundle("stable")
 
+    def test_rejects_channel_name_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            channels_dir = temp_root / "channels"
+            rules_dir = temp_root / "rules"
+            channels_dir.mkdir()
+            rules_dir.mkdir()
+
+            (channels_dir / "stable.json").write_text(
+                json.dumps({"name": "preview", "rules": ["CUSTOM-SUSPICIOUS-CURL.json"]}),
+                encoding="utf-8",
+            )
+            (rules_dir / "CUSTOM-SUSPICIOUS-CURL.json").write_text(
+                json.dumps(
+                    {
+                        "id": "CUSTOM-SUSPICIOUS-CURL",
+                        "name": "Suspicious curl usage",
+                        "description": "Detects shell commands that download remote content with curl.",
+                        "severity": "medium",
+                        "query": "curl http",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(build_bundle, "CHANNELS_DIR", channels_dir), mock.patch.object(
+                build_bundle, "RULES_DIR", rules_dir
+            ):
+                with self.assertRaisesRegex(build_bundle.ValidationError, r"must declare name 'stable'"):
+                    build_bundle.build_bundle("stable")
+
 
 if __name__ == "__main__":
     unittest.main()

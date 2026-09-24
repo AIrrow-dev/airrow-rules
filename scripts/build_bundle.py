@@ -110,6 +110,9 @@ def load_channel(channel_name: str) -> dict[str, object]:
     if not isinstance(rules, list) or not all(isinstance(rule, str) for rule in rules):
         raise ValidationError(f"{channel_path} must declare a string array in 'rules'")
 
+    if name != channel_name:
+        raise ValidationError(f"{channel_path} must declare name '{channel_name}'")
+
     return channel
 
 
@@ -124,6 +127,8 @@ def build_bundle(channel_name: str) -> dict[str, object]:
         rule_path = resolve_within(RULES_DIR, rule_filename)
         if not rule_path.exists():
             raise ValidationError(f"Rule file not found: {rule_path}")
+        if not rule_path.is_file():
+            raise ValidationError(f"Rule path is not a file: {rule_path}")
         rule = load_json(rule_path)
         if not isinstance(rule, dict):
             raise ValidationError(f"{rule_path} must contain a JSON object")
