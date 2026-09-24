@@ -22,6 +22,13 @@ class ValidateSchemaTests(unittest.TestCase):
 
         build_bundle.validate_schema(rule, self.schema)
 
+    def test_build_bundle_for_stable_channel(self) -> None:
+        bundle = build_bundle.build_bundle("stable")
+
+        self.assertEqual(bundle["channel"], "stable")
+        self.assertEqual(len(bundle["rules"]), 1)
+        self.assertEqual(bundle["rules"][0]["id"], "CUSTOM-SUSPICIOUS-CURL")
+
     def test_rejects_missing_required_field(self) -> None:
         with self.assertRaisesRegex(build_bundle.ValidationError, r"\$\.query is required"):
             build_bundle.validate_schema(
@@ -43,6 +50,20 @@ class ValidateSchemaTests(unittest.TestCase):
                     "description": "Detects shell commands that download remote content with curl.",
                     "severity": "info",
                     "query": "curl http",
+                },
+                self.schema,
+            )
+
+    def test_rejects_additional_property(self) -> None:
+        with self.assertRaisesRegex(build_bundle.ValidationError, r"\$\.extra is not allowed"):
+            build_bundle.validate_schema(
+                {
+                    "id": "CUSTOM-SUSPICIOUS-CURL",
+                    "name": "Suspicious curl usage",
+                    "description": "Detects shell commands that download remote content with curl.",
+                    "severity": "medium",
+                    "query": "curl http",
+                    "extra": "unexpected",
                 },
                 self.schema,
             )

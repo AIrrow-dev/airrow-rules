@@ -25,7 +25,13 @@ def load_json(path: Path) -> object:
 
 
 def validate_schema(instance: object, schema: dict[str, object], path: str = "$") -> None:
+    enum = schema.get("enum")
+    if isinstance(enum, list) and instance not in enum:
+        raise ValidationError(f"{path} must be one of: {', '.join(map(str, enum))}")
+
     expected_type = schema.get("type")
+    if expected_type is None:
+        return
 
     if expected_type == "object":
         if not isinstance(instance, dict):
@@ -69,10 +75,6 @@ def validate_schema(instance: object, schema: dict[str, object], path: str = "$"
             raise ValidationError(f"{path} must be a boolean")
     else:
         raise ValidationError(f"{path} uses unsupported schema type: {expected_type}")
-
-    enum = schema.get("enum")
-    if isinstance(enum, list) and instance not in enum:
-        raise ValidationError(f"{path} must be one of: {', '.join(map(str, enum))}")
 
 
 def load_channel(channel_name: str) -> dict[str, object]:
